@@ -7,6 +7,7 @@ from scrapy.spidermiddlewares.httperror import HttpError
 from twisted.internet.error import DNSLookupError
 from twisted.internet.error import TimeoutError, TCPTimedOutError
 import csv
+import sys
 from datetime import datetime
 
 class QuotesSpider(scrapy.Spider):
@@ -14,10 +15,16 @@ class QuotesSpider(scrapy.Spider):
 
     def start_requests(self):
         self.startCSV()
+        
+
         yield scrapy.Request(url='http://cityservices.baltimorecity.gov/water/', callback=self.getViewState, errback=self.errback_httpbin)
 
-
+    @inline_requests.inline_requests
     def getViewState(self,response):
+        if(response.status != 200):
+            #Site might be down. Log error/send email and shut it down.
+            print("Non 200 response " + str(response.status))
+            sys.exit()
         #Start by grabbing validation credentials by going to the homepage and grabbing what is generated.
         validation_array = {}
         validation_array['__VIEWSTATE'] = response.xpath('//input[@id="__VIEWSTATE"][1]/@value').extract_first()
@@ -33,17 +40,20 @@ class QuotesSpider(scrapy.Spider):
         #Now we can start running the water bills        
         url = 'http://cityservices.baltimorecity.gov/water/'
         
+        #Take the cookies from what was scraped above and add them to the new cookies to be passed.
         cookies = {
             'popup':'seen',
             'ASP.NET_SessionId':validation_array['SessionID']
         }
+        #Same with the different view states.
         post_params = {
             '__VIEWSTATE': validation_array['__VIEWSTATE'],
             '__VIEWSTATEGENERATOR': validation_array['__VIEWSTATEGENERATOR'],
             '__EVENTVALIDATION': validation_array['__EVENTVALIDATION'],
-            
             'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoServiceAddress': 'Get Info'
         }
+
+        #Run through all the addresses in our csv to start scraping.
         with open('Addresses.csv', 'r') as csvfile:
             addresses = csv.reader(csvfile)
             for x,row in enumerate(addresses):
@@ -51,12 +61,14 @@ class QuotesSpider(scrapy.Spider):
                 #address = row[5]
                 address = row[0]
                 post_params['ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$ucServiceAddress$txtServiceAddress']= address
-                yield scrapy.FormRequest(url=url, callback=self.parseWaterBill, cookies = cookies, method='POST',formdata=post_params, meta={'address':address})
+                yield scrapy.FormRequest(url=url, callback=self.parseWaterBill, cookies = cookies, method='POST',formdata=post_params, meta={'address':address,'timestamp':datetime.today()},errback=self.errback_httpbin)
 
     def parseWaterBill(self, response):
         #Check if we found the water bill
+        print("Seconds took to run: " + str(datetime.today() - response.meta['timestamp']) + " seconds.")
         if(len(response.xpath("//span[@id='ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblCurrentBalance']")) == 0):
             print("Couldn't find a water bill for address " + response.meta['address'])
+            self.writeFailedCSV(response.meta['address'])
             return None
         water_array = {}
         table = response.xpath('//table[@class="dataTable"]//tr')
@@ -64,7 +76,7 @@ class QuotesSpider(scrapy.Spider):
         for row in table:
             header = Selector(text=row.extract()).xpath('//th/text()').extract_first()
             value = Selector(text=row.extract()).xpath('//td/descendant::*/text()').extract_first()
-            print(str(header) + " " + str(value))
+            #print(str(header) + " " + str(value))
             if value == None:
                 value = '' #So it populates the excel sheet with a blank spot.s
             #    value = Selector(text=row.extract()).xpath('//td/span/b/text()').extract_first()
@@ -75,13 +87,17 @@ class QuotesSpider(scrapy.Spider):
                     value = datetime.strptime(value.strip(), '%m/%d/%Y').strftime('%Y-%m-%d')
                 water_array[header.strip().replace(':',"")] = value.strip()
         
-        print(water_array)
+        #print(water_array)
         self.writeDataToCSV(water_array)
 
+    def writeFailedCSV(self,address):
+        with open('failed.csv',"a",newline='') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow([address])
     def writeDataToCSV(self,data):
         data['TimeStamp'] = datetime.today().strftime('%Y-%m-%d')
         with open('waterbill.csv', "a",newline='') as csv_file:
-            print(data.keys())
+            #print(data.keys())
             writer = csv.DictWriter(csv_file, fieldnames=data.keys())
             writer.writerow(data)
     def startCSV(self):
@@ -94,7 +110,7 @@ class QuotesSpider(scrapy.Spider):
     def errback_httpbin(self, failure):
         # log all failures
         self.logger.error(repr(failure))
-
+        print("Error in HTTP Request!")
         # in case you want to do something special for some errors,
         # you may need the failure's type:
 
@@ -112,3 +128,5 @@ class QuotesSpider(scrapy.Spider):
         elif failure.check(TimeoutError, TCPTimedOutError):
             request = failure.request
             self.logger.error('TimeoutError on %s', request.url)
+        sys.exit()
+        
