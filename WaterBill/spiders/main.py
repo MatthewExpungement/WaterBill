@@ -9,47 +9,39 @@ from twisted.internet.error import TimeoutError, TCPTimedOutError
 import csv
 import sys
 from datetime import datetime
+import time
+import pprint
+import json
+from scrapy import signals
+from scrapy.xlib.pydispatch import dispatcher
+from WaterBill.items import WaterbillItem
 
-class QuotesSpider(scrapy.Spider):
+class WaterSpider(scrapy.Spider):
     name = "water"
-
+    def __init__(self,stats):
+        dispatcher.connect(self.spider_closed, signals.spider_closed)
+        self.stats = stats 
+    @classmethod 
+    def from_crawler(cls, crawler): 
+      return cls(crawler.stats)
     def start_requests(self):
-        self.startCSV()
-        
+        #Pull saved session ID Info
+        with open('items.json') as f:
+            sessioninfo = json.load(f)
+        sessioninfo = sessioninfo[0]
 
-        yield scrapy.Request(url='http://cityservices.baltimorecity.gov/water/', callback=self.getViewState, errback=self.errback_httpbin)
-
-    @inline_requests.inline_requests
-    def getViewState(self,response):
-        if(response.status != 200):
-            #Site might be down. Log error/send email and shut it down.
-            print("Non 200 response " + str(response.status))
-            sys.exit()
-        #Start by grabbing validation credentials by going to the homepage and grabbing what is generated.
-        validation_array = {}
-        validation_array['__VIEWSTATE'] = response.xpath('//input[@id="__VIEWSTATE"][1]/@value').extract_first()
-        validation_array['__VIEWSTATEGENERATOR'] = response.xpath('//input[@id="__VIEWSTATEGENERATOR"][1]/@value').extract_first()
-        validation_array['__EVENTVALIDATION'] = response.xpath('//input[@id="__EVENTVALIDATION"][1]/@value').extract_first()
-        
-        #Need to search through the cookies to find the ASP.NET_SessionId
-        cookies = response.headers.getlist('Set-Cookie')[0].decode("utf-8").split(';')
-        for cookie in cookies:
-            if("Session" in cookie):
-                validation_array['SessionID'] = cookie.split('=')[1]
-
-        #Now we can start running the water bills        
         url = 'http://cityservices.baltimorecity.gov/water/'
         
         #Take the cookies from what was scraped above and add them to the new cookies to be passed.
         cookies = {
             'popup':'seen',
-            'ASP.NET_SessionId':validation_array['SessionID']
+            'ASP.NET_SessionId': sessioninfo['sessioncookie']
         }
         #Same with the different view states.
         post_params = {
-            '__VIEWSTATE': validation_array['__VIEWSTATE'],
-            '__VIEWSTATEGENERATOR': validation_array['__VIEWSTATEGENERATOR'],
-            '__EVENTVALIDATION': validation_array['__EVENTVALIDATION'],
+            '__VIEWSTATE':  sessioninfo['VIEWSTATE'],
+            '__VIEWSTATEGENERATOR': sessioninfo['VIEWSTATEGENERATOR'],
+            '__EVENTVALIDATION': sessioninfo['EVENTVALIDATION'],
             'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoServiceAddress': 'Get Info'
         }
 
@@ -57,20 +49,18 @@ class QuotesSpider(scrapy.Spider):
         with open('Addresses.csv', 'r') as csvfile:
             addresses = csv.reader(csvfile)
             for x,row in enumerate(addresses):
-                print("Row " + str(x))
-                #address = row[5]
+                self.log("Row " + str(x))
                 address = row[0]
                 post_params['ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$ucServiceAddress$txtServiceAddress']= address
-                yield scrapy.FormRequest(url=url, callback=self.parseWaterBill, cookies = cookies, method='POST',formdata=post_params, meta={'address':address,'timestamp':datetime.today()},errback=self.errback_httpbin)
-
+                yield scrapy.FormRequest(url=url, callback=self.parseWaterBill, cookies = cookies, method='POST',formdata=post_params, meta={'address':address,'timestamp':datetime.today(),'row_num':str(x)},errback=self.errback_httpbin,dont_filter = True)
     def parseWaterBill(self, response):
         #Check if we found the water bill
-        print("Seconds took to run: " + str(datetime.today() - response.meta['timestamp']) + " seconds.")
+        #print("Seconds took to run row " + response.meta['row_num'] + ": " + str(datetime.today() - response.meta['timestamp']) + " seconds.")
         if(len(response.xpath("//span[@id='ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblCurrentBalance']")) == 0):
             print("Couldn't find a water bill for address " + response.meta['address'])
             self.writeFailedCSV(response.meta['address'])
             return None
-        water_array = {}
+        wateritem = WaterbillItem()
         table = response.xpath('//table[@class="dataTable"]//tr')
         headers = ['Account Number', 'Service Address', 'Current Read Date', 'Current Bill Date', 'Penalty Date', 'Current Bill Amount', 'Previous Balance', 'Current Balance', 'Previous Read Date', 'Last Pay Date', 'Last Pay Amount','TimeStamp']
         for row in table:
@@ -78,35 +68,20 @@ class QuotesSpider(scrapy.Spider):
             value = Selector(text=row.extract()).xpath('//td/descendant::*/text()').extract_first()
             #print(str(header) + " " + str(value))
             if value == None:
-                value = '' #So it populates the excel sheet with a blank spot.s
-            #    value = Selector(text=row.extract()).xpath('//td/span/b/text()').extract_first()
+                value = '' #So it populates the excel sheet with a blank spot
             if(header != None and header.strip().replace(':',"") in headers):
                 value = value.replace('$','').replace(",",'')
                 if("Date" in header and value != ''):
                     #Convert to SQL Datetime Format
                     value = datetime.strptime(value.strip(), '%m/%d/%Y').strftime('%Y-%m-%d')
-                water_array[header.strip().replace(':',"")] = value.strip()
-        
-        #print(water_array)
-        self.writeDataToCSV(water_array)
+                wateritem[header.strip().replace(':',"").replace(' ','_')] = value.strip()
+        wateritem['Timestamp'] = datetime.today().strftime('%Y-%m-%d')
+        return wateritem
 
     def writeFailedCSV(self,address):
         with open('failed.csv',"a",newline='') as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow([address])
-    def writeDataToCSV(self,data):
-        data['TimeStamp'] = datetime.today().strftime('%Y-%m-%d')
-        with open('waterbill.csv', "a",newline='') as csv_file:
-            #print(data.keys())
-            writer = csv.DictWriter(csv_file, fieldnames=data.keys())
-            writer.writerow(data)
-    def startCSV(self):
-        #This is just to put the headers in a new csv
-        headers = ['Account Number', 'Service Address', 'Current Read Date', 'Current Bill Date', 'Penalty Date', 'Current Bill Amount', 'Previous Balance', 'Current Balance', 'Previous Read Date', 'Last Pay Date', 'Last Pay Amount','TimeStamp']
-        with open('waterbill.csv', "w",newline='') as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=headers)
-            writer.writeheader()
-
     def errback_httpbin(self, failure):
         # log all failures
         self.logger.error(repr(failure))
@@ -129,4 +104,5 @@ class QuotesSpider(scrapy.Spider):
             request = failure.request
             self.logger.error('TimeoutError on %s', request.url)
         sys.exit()
-        
+    def spider_closed(self, spider):
+        self.log("Scraped " + str(spider.stats.get_value('item_scraped_count')) + " in " + str(spider.stats.get_value('finish_time') - spider.stats.get_value('start_time')) + " seconds")

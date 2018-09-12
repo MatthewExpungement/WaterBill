@@ -29,4 +29,5 @@ EXPOSE 443
 #docker run -t -d -v c:\Dropbox\Projects\WaterBill:/app --name scraper scrapy_server
 #docker run -t -d -v /home/ubuntu/WaterBill:/app --name scraper scrapy_server
 #docker exec -it scraper /bin/bash
+#scrapy crawl sessioninfo
 #scrapy crawl water
