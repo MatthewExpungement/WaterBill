@@ -33,7 +33,7 @@ source $HOME/.keychain/$HOSTNAME-sh
 #Log out and back in. Enter the password for the ssh key once and you're good to go for life
 
 #Clone a repo
-git cone git@github.com:harvardlaw/Connecticut_Scraper.git
+git cone git@github.com:<org>/<repository name>
 
 #FTP
 #Set to SFTP
@@ -41,3 +41,4 @@ git cone git@github.com:harvardlaw/Connecticut_Scraper.git
 #Select Logon Type as keyfile
 #User is the username
 #Show location to key file
+#
