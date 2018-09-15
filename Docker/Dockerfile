@@ -13,21 +13,19 @@ RUN pip3 install requests lxml
 #Nano
 RUN apt-get install nano -y
 
-#GIT
-RUN apt-get install git -y
 
-#Make FTP Folder
-WORKDIR "/"
-RUN mkdir ftpdocs
 
 WORKDIR "/"
 
-EXPOSE 80
 EXPOSE 3306
-EXPOSE 443
 
-#docker run -t -d -v c:\Dropbox\Projects\WaterBill:/app --name scraper scrapy_server
-#docker run -t -d -v /home/ubuntu/WaterBill:/app --name scraper scrapy_server
+#docker run -t -d -v c:\Dropbox\Projects\WaterBill:/app --name scraper -e sql_server='172.17.0.2' -e sql_user='root' -e sql_password='password' -e address_list='Addresses_Sample.csv' scrapy_server
+#docker run -t -d -v /home/ubuntu/WaterBill:/app --name scraper -e sql_server='172.17.0.3' scrapy_server
+#-e sql_server = '172.17.0.2'
+#-e sql_user = 'root'
+#-e sql_password = 'password'
+#-e address_list = 'Addresses_Sample'
+
 #docker exec -it scraper /bin/bash
 #scrapy crawl sessioninfo
 #scrapy crawl water

@@ -64,9 +64,9 @@ CONCURRENT_REQUESTS_PER_IP = 20
 
 # Configure item pipelines
 # See https://doc.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'WaterBill.pipelines.WaterbillPipeline': 300,
-#}
+ITEM_PIPELINES = {
+    'WaterBill.pipelines.WaterbillPipeline': 300,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://doc.scrapy.org/en/latest/topics/autothrottle.html

@@ -32,4 +32,6 @@ class WaterbillItem(Item):
     Last_Pay_Date=Field()
     Last_Pay_Amount=Field()
     Timestamp = Field()
+    TurnOffDate = Field()
+    Searched_Address = Field()
     pass

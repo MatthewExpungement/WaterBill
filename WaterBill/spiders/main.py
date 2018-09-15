@@ -15,6 +15,7 @@ import json
 from scrapy import signals
 from scrapy.xlib.pydispatch import dispatcher
 from WaterBill.items import WaterbillItem
+import os
 
 class WaterSpider(scrapy.Spider):
     name = "water"
@@ -26,9 +27,8 @@ class WaterSpider(scrapy.Spider):
       return cls(crawler.stats)
     def start_requests(self):
         #Pull saved session ID Info
-        with open('items.json') as f:
+        with open('session_info.json') as f:
             sessioninfo = json.load(f)
-        sessioninfo = sessioninfo[0]
 
         url = 'http://cityservices.baltimorecity.gov/water/'
         
@@ -46,7 +46,7 @@ class WaterSpider(scrapy.Spider):
         }
 
         #Run through all the addresses in our csv to start scraping.
-        with open('Addresses.csv', 'r') as csvfile:
+        with open('/app/' + os.environ['address_list'], 'r') as csvfile:
             addresses = csv.reader(csvfile)
             for x,row in enumerate(addresses):
                 self.log("Row " + str(x))
@@ -61,8 +61,14 @@ class WaterSpider(scrapy.Spider):
             self.writeFailedCSV(response.meta['address'])
             return None
         wateritem = WaterbillItem()
+        wateritem['Searched_Address'] = response.meta['address']
         table = response.xpath('//table[@class="dataTable"]//tr')
         headers = ['Account Number', 'Service Address', 'Current Read Date', 'Current Bill Date', 'Penalty Date', 'Current Bill Amount', 'Previous Balance', 'Current Balance', 'Previous Read Date', 'Last Pay Date', 'Last Pay Amount','TimeStamp']
+        if(len(response.xpath("//span[@id='ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblTurnOffDate']"))!=0):
+            wateritem['TurnOffDate'] = "Yes"
+            #wateritem['TurnOffDate'] = Selector(text=row.extract()).xpath("//span[@id='ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblTurnOffDate']").extract_first()
+        else:
+            wateritem['TurnOffDate'] = 'No'
         for row in table:
             header = Selector(text=row.extract()).xpath('//th/text()').extract_first()
             value = Selector(text=row.extract()).xpath('//td/descendant::*/text()').extract_first()
