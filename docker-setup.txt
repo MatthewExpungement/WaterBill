@@ -2,10 +2,11 @@ sudo apt-get update -y
 sudo apt-get upgrade -y
 
 #Download Docker
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-apt-cache policy docker-ce
-sudo apt-get install -y docker-ce
+sudo apt install apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic test"
+sudo apt update
+sudo apt install docker-ce
 sudo systemctl status docker
 ctrl c
 sudo usermod -aG docker ${USER} #This makes it so you don't have to use sudo
@@ -16,7 +17,7 @@ sudo apt-get install git-core
 
 #Install a key so you don't have to type in your git password
 ssh-keygen -t rsa -b 4096
-cd /.ssh
+cd .ssh
 nano id_rsa.pub
 #Press Esc then $ to word wrap. Copy that into github ssh key
 #eval $(ssh-agent -s)
