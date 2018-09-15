@@ -20,7 +20,7 @@ WORKDIR "/"
 EXPOSE 3306
 
 #docker run -t -d -v c:\Dropbox\Projects\WaterBill:/app --name scraper -e sql_server='172.17.0.2' -e sql_user='root' -e sql_password='password' -e address_list='Addresses_Sample.csv' scrapy_server
-#docker run -t -d -v /home/ubuntu/WaterBill:/app --name scraper -e sql_server='172.17.0.3' scrapy_server
+#docker run -t -d -v /home/ubuntu/WaterBill:/app --name scraper -e sql_server='172.17.0.3' -e sql_user='root' -e sql_password='12345' -e address_list='Addresses_Sample.csv' scrapy_server
 #-e sql_server = '172.17.0.2'
 #-e sql_user = 'root'
 #-e sql_password = 'password'
