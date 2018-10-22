@@ -1,0 +1,42 @@
+version: "3.5"
+services:
+  db:
+    image: "mysql:latest"
+    ports:
+     - "3306:3306"
+    networks:
+      waterbill-net:
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+    volumes:
+      - type: bind
+        #source: /home/ubuntu/MySQL_Data:/var/lib/mysql
+        source: C:\Dropbox\Projects\Mysql\mysql_data
+        target: /var/lib/mysql
+  crawler:
+    build: .
+    command: ./ss.sh
+    networks:
+      - waterbill-net
+    volumes:
+      - type: bind
+        #source: /home/ubuntu/WaterBill:/app
+        source: c:\Dropbox\Projects\WaterBill
+        target: /app
+    environment:
+      - sql_server=db
+      - sql_user=root
+      - sql_password=example
+      - accounts_list=FullAccountNumbers.csv
+    depends_on:
+      - db
+networks:
+  waterbill-net:
+
+volumes:
+  waterbill-vol:
+
+#docker-compose up -d
+#docker-compose down
+#0 0 0 01,15 * docker-compose /home/ubuntu/WaterBill/Docker/docker-compose.yml down
+#3 0 0 01,15 * docker-compose -f /home/ubuntu/WaterBill/Docker/docker-compose.yml up -d 

@@ -15,7 +15,9 @@ import json
 from scrapy import signals
 from scrapy.xlib.pydispatch import dispatcher
 from WaterBill.items import WaterbillItem
+from WaterBill.items import SessionIDItem
 import os
+from scrapy.crawler import CrawlerProcess
 
 class WaterSpider(scrapy.Spider):
     name = "water"
@@ -28,6 +30,7 @@ class WaterSpider(scrapy.Spider):
     def start_requests(self):
         #Pull saved session ID Info
         with open('session_info.json') as f:
+            #A shell script runs the sessioninfo spyder first which gets and saves the session info in a file that is loaded here.
             sessioninfo = json.load(f)
 
         url = 'http://cityservices.baltimorecity.gov/water/'
@@ -42,28 +45,37 @@ class WaterSpider(scrapy.Spider):
             '__VIEWSTATE':  sessioninfo['VIEWSTATE'],
             '__VIEWSTATEGENERATOR': sessioninfo['VIEWSTATEGENERATOR'],
             '__EVENTVALIDATION': sessioninfo['EVENTVALIDATION'],
-            'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoServiceAddress': 'Get Info'
+            #This is to search by Address if you wanted to do it that way.
+            #'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoServiceAddress': 'Get Info'
+            'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoAccount':'Get Info'
         }
 
-        #Run through all the addresses in our csv to start scraping.
-        with open('/app/' + os.environ['address_list'], 'r') as csvfile:
-            addresses = csv.reader(csvfile)
-            for x,row in enumerate(addresses):
-                self.log("Row " + str(x))
-                address = row[0]
-                post_params['ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$ucServiceAddress$txtServiceAddress']= address
-                yield scrapy.FormRequest(url=url, callback=self.parseWaterBill, cookies = cookies, method='POST',formdata=post_params, meta={'address':address,'timestamp':datetime.today(),'row_num':str(x)},errback=self.errback_httpbin,dont_filter = True)
+        #Run through all the account numbers in our csv to start scraping.
+        with open('/app/' + os.environ['accounts_list'], 'r') as csvfile:
+            accounts = csv.reader(csvfile)
+            for x,row in enumerate(accounts):
+                self.logger.info("Row " + str(x))
+                if(len(row) == 0):
+                    self.logger.info("Blank so we're skipping")
+                    #This means  one of the rows was blank.
+                    continue
+                account = row[0]
+                #This is to search by address
+                #post_params['ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$ucServiceAddress$txtServiceAddress']= address
+                post_params['ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$txtAccountNumber']= account
+                yield scrapy.FormRequest(url=url, callback=self.parseWaterBill, cookies = cookies, method='POST',formdata=post_params, meta={'account':account,'timestamp':datetime.today(),'row_num':str(x)},errback=self.errback_httpbin,dont_filter = True)
     def parseWaterBill(self, response):
-        #Check if we found the water bill
-        #print("Seconds took to run row " + response.meta['row_num'] + ": " + str(datetime.today() - response.meta['timestamp']) + " seconds.")
+        #Check if we found the water bill if not then write to the failed CSV and return.
         if(len(response.xpath("//span[@id='ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblCurrentBalance']")) == 0):
-            print("Couldn't find a water bill for address " + response.meta['address'])
-            self.writeFailedCSV(response.meta['address'])
+            print("Couldn't find a water bill for account " + response.meta['account'])
+            self.writeFailedCSV(response.meta['account'])
             return None
+        #I use the item feature in scrapy to store the items.
         wateritem = WaterbillItem()
-        wateritem['Searched_Address'] = response.meta['address']
+        wateritem['Searched_Address'] = "By Account" #This is a relic of when I searched by addresses.
         table = response.xpath('//table[@class="dataTable"]//tr')
         headers = ['Account Number', 'Service Address', 'Current Read Date', 'Current Bill Date', 'Penalty Date', 'Current Bill Amount', 'Previous Balance', 'Current Balance', 'Previous Read Date', 'Last Pay Date', 'Last Pay Amount','TimeStamp']
+        #I can't determine if this actually works because I can't find an address with a shut off notice.
         if(len(response.xpath("//span[@id='ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblTurnOffDate']"))!=0):
             wateritem['TurnOffDate'] = "Yes"
             #wateritem['TurnOffDate'] = Selector(text=row.extract()).xpath("//span[@id='ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblTurnOffDate']").extract_first()
@@ -72,7 +84,6 @@ class WaterSpider(scrapy.Spider):
         for row in table:
             header = Selector(text=row.extract()).xpath('//th/text()').extract_first()
             value = Selector(text=row.extract()).xpath('//td/descendant::*/text()').extract_first()
-            #print(str(header) + " " + str(value))
             if value == None:
                 value = '' #So it populates the excel sheet with a blank spot
             if(header != None and header.strip().replace(':',"") in headers):
@@ -85,6 +96,7 @@ class WaterSpider(scrapy.Spider):
         return wateritem
 
     def writeFailedCSV(self,address):
+        #This creates a Fail CSV file so you can investigate as to why it failed. This usually works better with addresses.
         with open('failed.csv',"a",newline='') as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow([address])
@@ -109,6 +121,5 @@ class WaterSpider(scrapy.Spider):
         elif failure.check(TimeoutError, TCPTimedOutError):
             request = failure.request
             self.logger.error('TimeoutError on %s', request.url)
-        sys.exit()
     def spider_closed(self, spider):
-        self.log("Scraped " + str(spider.stats.get_value('item_scraped_count')) + " in " + str(spider.stats.get_value('finish_time') - spider.stats.get_value('start_time')) + " seconds")
+        self.logger.info("Scraped " + str(spider.stats.get_value('item_scraped_count')) + " in " + str(spider.stats.get_value('finish_time') - spider.stats.get_value('start_time')) + " seconds")

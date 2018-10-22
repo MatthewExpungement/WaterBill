@@ -8,14 +8,21 @@ import os
 
 class WaterbillPipeline(object):
     def __init__(self):
-        # Connect to the database
-        self.conn = pymysql.connect(host=os.environ['sql_server'],
-                             user=os.environ['sql_user'],
-                             password=os.environ['sql_password'],
-                             db='water',
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor)
-        self.cursor = self.conn.cursor()
+        try:
+            # Connect to the database
+            print("----------------------------")
+            print(os.environ)
+            print(os.environ['sql_server'])
+            self.conn = pymysql.connect(host=os.environ['sql_server'],
+                                user=os.environ['sql_user'],
+                                password=os.environ['sql_password'],
+                                db='water',
+                                charset='utf8mb4',
+                                cursorclass=pymysql.cursors.DictCursor)
+            self.cursor = self.conn.cursor()
+        except Exception as e:
+            print("SQL Error")
+            print(e)
     def process_item(self, item, spider):
         if(spider.name == 'sessioninfo'):
             self.file = open('session_info.json', 'w')

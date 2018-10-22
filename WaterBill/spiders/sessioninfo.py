@@ -10,7 +10,6 @@ class SessioninfoSpider(scrapy.Spider):
         yield scrapy.Request(url='http://cityservices.baltimorecity.gov/water/')
 
     def parse(self, response):
-        print("getting view state")
         item = SessionIDItem()
         if(response.status != 200):
             #Site might be down. Log error/send email and shut it down.
