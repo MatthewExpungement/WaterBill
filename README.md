@@ -1,4 +1,4 @@
-#Water Bill Scraper
+# Water Bill Scraper
 
 ## TLDR
 Scrapes about 220,000 water bills from the Baltimore City Water Bill Website. This is a dockerized app that uses the python framework scrapy. The resulting information is saved into a mysql table.
