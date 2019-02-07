@@ -10,7 +10,7 @@ services:
       MYSQL_ROOT_PASSWORD: example
     volumes:
       - type: bind
-        #source: /home/ubuntu/MySQL_Data:/var/lib/mysql
+        #source: /home/ubuntu/MySQL_Data
         source: C:\Dropbox\Projects\Mysql\mysql_data
         target: /var/lib/mysql
   crawler:
