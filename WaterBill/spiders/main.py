@@ -41,13 +41,22 @@ class WaterSpider(scrapy.Spider):
             'ASP.NET_SessionId': sessioninfo['sessioncookie']
         }
         #Same with the different view states.
+        search_type = os.environ['search_type']
+        if(os.environ['search_type'] == 'Address'):
+            param_get_info = 'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoServiceAddress'
+            param_search_type = 'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$ucServiceAddress$txtServiceAddress'
+        else:
+            #Account
+            param_get_info = 'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoAccount'
+            param_search_type = 'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$txtAccountNumber'
+
         post_params = {
             '__VIEWSTATE':  sessioninfo['VIEWSTATE'],
             '__VIEWSTATEGENERATOR': sessioninfo['VIEWSTATEGENERATOR'],
             '__EVENTVALIDATION': sessioninfo['EVENTVALIDATION'],
             #This is to search by Address if you wanted to do it that way.
-            #'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoServiceAddress': 'Get Info'
-            'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoAccount':'Get Info'
+            param_get_info: 'Get Info'
+            #'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoAccount':'Get Info'
         }
 
         #Run through all the account numbers in our csv to start scraping.
@@ -59,20 +68,20 @@ class WaterSpider(scrapy.Spider):
                     self.logger.info("Blank so we're skipping")
                     #This means  one of the rows was blank.
                     continue
-                account = row[0]
+                account_or_address = row[0]
                 #This is to search by address
                 #post_params['ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$ucServiceAddress$txtServiceAddress']= address
-                post_params['ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$txtAccountNumber']= account
-                yield scrapy.FormRequest(url=url, callback=self.parseWaterBill, cookies = cookies, method='POST',formdata=post_params, meta={'account':account,'timestamp':datetime.today(),'row_num':str(x)},errback=self.errback_httpbin,dont_filter = True)
+                post_params[param_search_type]= account_or_address
+                yield scrapy.FormRequest(url=url, callback=self.parseWaterBill, cookies = cookies, method='POST',formdata=post_params, meta={'search_type':search_type,'account_or_address':account_or_address,'timestamp':datetime.today(),'row_num':str(x)},errback=self.errback_httpbin,dont_filter = True)
     def parseWaterBill(self, response):
         #Check if we found the water bill if not then write to the failed CSV and return.
         if(len(response.xpath("//span[@id='ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblCurrentBalance']")) == 0):
-            print("Couldn't find a water bill for account " + response.meta['account'])
-            self.writeFailedCSV(response.meta['account'])
+            print("Couldn't find a water bill for account " + response.meta['account_or_address'])
+            self.writeFailedCSV(response.meta['account_or_address'])
             return None
         #I use the item feature in scrapy to store the items.
         wateritem = WaterbillItem()
-        wateritem['Searched_Address'] = "By Account" #This is a relic of when I searched by addresses.
+        wateritem['Searched_Address'] = response.meta['search_type'] #This is a relic of when I searched by addresses.
         table = response.xpath('//table[@class="dataTable"]//tr')
         headers = ['Account Number', 'Service Address', 'Current Read Date', 'Current Bill Date', 'Penalty Date', 'Current Bill Amount', 'Previous Balance', 'Current Balance', 'Previous Read Date', 'Last Pay Date', 'Last Pay Amount','TimeStamp']
         #I can't determine if this actually works because I can't find an address with a shut off notice.

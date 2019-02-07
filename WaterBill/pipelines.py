@@ -35,7 +35,11 @@ class WaterbillPipeline(object):
                     if(item[key] == ''):
                         item[key] = None
                 with self.conn.cursor() as cursor:
-                    sql = "INSERT INTO water_bills (`Account_Number`, `Service_Address`, `Current_Read_Date`, `Current_Bill_Date`, `Penalty_Date`, `Current_Bill_Amount`, `Previous_Balance`, `Current_Balance`, `Previous_Read_Date`, `Last_Pay_Date`, `Last_Pay_Amount`,`TimeStamp`,`TurnOffDate`,`Searched_Address`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)"
+                    if(os.environ['search_type'] == 'Address'):
+                        table = 'baltimore_county'
+                    else:
+                        table = 'water_bills'
+                    sql = "INSERT INTO " + table + " (`Account_Number`, `Service_Address`, `Current_Read_Date`, `Current_Bill_Date`, `Penalty_Date`, `Current_Bill_Amount`, `Previous_Balance`, `Current_Balance`, `Previous_Read_Date`, `Last_Pay_Date`, `Last_Pay_Amount`,`TimeStamp`,`TurnOffDate`,`Searched_Address`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)"
                     cursor.execute(sql, (item['Account_Number'], item['Service_Address'], item['Current_Read_Date'], item['Current_Bill_Date'], item['Penalty_Date'], item['Current_Bill_Amount'], item['Previous_Balance'], item['Current_Balance'], item['Previous_Read_Date'], item['Last_Pay_Date'], item['Last_Pay_Amount'], item['Timestamp'], item['TurnOffDate'], item['Searched_Address']))
                     self.conn.commit()
             except Exception as e:

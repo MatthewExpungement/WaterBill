@@ -15,7 +15,7 @@ services:
         target: /var/lib/mysql
   crawler:
     build: .
-    command: ./ss.sh
+    command: tail -F anything
     networks:
       - waterbill-net
     volumes:
@@ -27,7 +27,8 @@ services:
       - sql_server=db
       - sql_user=root
       - sql_password=example
-      - accounts_list=FullAccountNumbers.csv
+      - accounts_list=BaltimoreCountyAddressesFull.csv
+      - search_type=Address
     depends_on:
       - db
 networks:
