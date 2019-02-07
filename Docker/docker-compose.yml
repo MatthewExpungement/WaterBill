@@ -20,7 +20,7 @@ services:
       - waterbill-net
     volumes:
       - type: bind
-        #source: /home/ubuntu/WaterBill:/app
+        #source: /home/ubuntu/WaterBill
         source: c:\Dropbox\Projects\WaterBill
         target: /app
     environment:
