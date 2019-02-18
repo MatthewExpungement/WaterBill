@@ -10,6 +10,7 @@ Scrapes water bills in bulk from the Baltimore City Water Bill Website. This can
 This runs using docker so make sure it is installed. 
 
 <pre>
+cd WaterBill chmod +x start.sh #Otherwise the docker entrypoint runs into permission issues.
 docker network create --driver bridge waternet
 docker run -p 3306:3306 --name wb_sql -v /path/to/mysql/folder:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=example --network waternet -d mysql:8.0.12 
 cd WaterBill/Docker/scraper
@@ -27,8 +28,10 @@ There are several enviornment variables you can change when running the scraper.
 -e search_type='Accounts' #Either Accounts or Address
 </pre>
 
-This script runs the first spyder which grabs and saves the session information from the water bill site. The second command runs the second spyder which will run through a csv of account numbers, searching each one, and recording the infromation into the mysql database. 
+This script runs the first spyder which grabs and saves the session information from the water bill site. The second command runs the second spyder which will run through a csv of account numbers or addresses, searching each one, and recording the infromation into the mysql database. 
 
 Included in another csv called Real_Property_Taxes.csv which is from the open baltimore website. You can modify the second spyder slightly to have it run addresses instead of account numbers.
 
-If you are running this on a public server make sure to chang ethe password in the docker-compose.yml file!
+Consider using a strong password than example.
+
+If you're interested in collaborating on what to do with this data please let me know!
