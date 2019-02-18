@@ -43,6 +43,7 @@ class WaterSpider(scrapy.Spider):
         #Same with the different view states.
         search_type = os.environ['search_type']
         if(os.environ['search_type'] == 'Address'):
+            #Address
             param_get_info = 'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoServiceAddress'
             param_search_type = 'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$ucServiceAddress$txtServiceAddress'
         else:
@@ -54,13 +55,11 @@ class WaterSpider(scrapy.Spider):
             '__VIEWSTATE':  sessioninfo['VIEWSTATE'],
             '__VIEWSTATEGENERATOR': sessioninfo['VIEWSTATEGENERATOR'],
             '__EVENTVALIDATION': sessioninfo['EVENTVALIDATION'],
-            #This is to search by Address if you wanted to do it that way.
-            param_get_info: 'Get Info'
-            #'ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnGetInfoAccount':'Get Info'
+            param_get_info: 'Get Info' #Clicks the right button
         }
 
         #Run through all the account numbers in our csv to start scraping.
-        with open('/app/' + os.environ['accounts_list'], 'r') as csvfile:
+        with open('/app/SourceCSVs/' + os.environ['county'] + os.environ['search_type'] + ".csv", 'r') as csvfile:
             accounts = csv.reader(csvfile)
             for x,row in enumerate(accounts):
                 self.logger.info("Row " + str(x))
@@ -68,10 +67,8 @@ class WaterSpider(scrapy.Spider):
                     self.logger.info("Blank so we're skipping")
                     #This means  one of the rows was blank.
                     continue
-                account_or_address = row[0]
-                #This is to search by address
-                #post_params['ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$ucServiceAddress$txtServiceAddress']= address
-                post_params[param_search_type]= account_or_address
+                account_or_address = row[0] #The address or account number
+                post_params[param_search_type]= account_or_address #This sets the right post key with the address
                 yield scrapy.FormRequest(url=url, callback=self.parseWaterBill, cookies = cookies, method='POST',formdata=post_params, meta={'search_type':search_type,'account_or_address':account_or_address,'timestamp':datetime.today(),'row_num':str(x)},errback=self.errback_httpbin,dont_filter = True)
     def parseWaterBill(self, response):
         #Check if we found the water bill if not then write to the failed CSV and return.

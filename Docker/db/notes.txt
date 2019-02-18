@@ -1,0 +1,7 @@
+#This is for a mysql docker
+docker network create --driver bridge waternet
+docker run -p 3306:3306 --name wb_sql -v /path/to/mysql/folder:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=example --network waternet -d mysql:8.0.12 
+
+
+
+docker inspect -f "{{ .NetworkSettings.Networks.waternet.IPAddress }}" wb_sql
