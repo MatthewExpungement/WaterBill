@@ -14,5 +14,4 @@ RUN pip3 install requests lxml
 RUN apt-get install nano -y
 
 WORKDIR "/app"
-RUN ["chmod", "+x", "/app/start.sh"]
 ENTRYPOINT ["./app/start.sh"]
